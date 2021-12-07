@@ -1,0 +1,1 @@
+a=$<.map &:to_i;p *[2,4].map{|x|a.each_cons(x).count{_1[0]<_1[-1]}}
