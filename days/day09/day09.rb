@@ -6,16 +6,15 @@ module Day09
   end
 
   def self.cell(board, x, y)
-    return nil if x < 0 || y < 0 || x >= board[0].size || y >= board.size
+    return nil if x.negative? || y.negative? || x >= board[0].size || y >= board.size
 
     board[y][x]
   end
-  
-  VECTORS = [[1, 0],[-1, 0],[0, 1],[0, -1]]
+
+  VECTORS = [[1, 0], [-1, 0], [0, 1], [0, -1]].freeze
 
   def self.neighbours(board, x, y)
-
-    VECTORS.filter_map{ |dx, dy| cell(board, x + dx, y + dy)}
+    VECTORS.filter_map { |dx, dy| cell(board, x + dx, y + dy) }
   end
 
   def self.part1(input)
@@ -35,7 +34,7 @@ module Day09
     end
   end
 
-  def self.floodfill(board, x,y)
+  def self.floodfill(board, x, y)
     return 0 if cell(board, x, y).nil? || cell(board, x, y) > 8
 
     board[y][x] = 9
