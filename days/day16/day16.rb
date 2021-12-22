@@ -4,7 +4,6 @@ module Day16
   end
 
   class PacketParser
-
     def initialize(binary)
       @binary = binary
       @read_pointer = 0
@@ -88,8 +87,6 @@ module Day16
     packet = parser.parse_packet
     packet.versions_sum
   end
-
-  
 
   def self.part2(input)
     binary = parse(input)
