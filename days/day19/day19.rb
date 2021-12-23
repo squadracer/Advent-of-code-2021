@@ -1,137 +1,113 @@
-require 'pry'
 module Day19
-  class Scanner
-    attr_accessor :beacons
-    attr_accessor :index
-    attr_accessor :rotations
-    attr_accessor :scanner_position
-
-    BEACONS_COUNT = 12
-    def initialize(index, beacons)
-      @index = index
-      @beacons = beacons
-      @rotations = {}
-      compute_rotations
-      @scanner_position = [0, 0, 0]
+  def self.parse(input)
+    input.split("\n\n").map do |scanner|
+      points = scanner.split("\n")[1..]
+      points.map { |point| point.split(',').map(&:to_i) }
     end
-    
-    def realign(aligned_beacons, new_scanner_position)
-      @beacons = aligned_beacons
-      @rotations = {}
-      @scanner_position = new_scanner_position
-    end
-
-    def to_s
-      "Scanner #{index}, position: #{scanner_position} : #{beacons.size} beacons"
-    end
-    
-    def rotate_6_sides(x, y, z)
-      [[x,y,z],
-      [z,y,-x],
-      [-x,y,-z],
-      [-z,y,x],
-      [x,z,-y],
-      [x,-z,y]]
-    end
-
-    def rotate_4_faces(x, y, z)
-      [[x,y,z],
-      [y,-x,z],
-      [-x,-y,z],
-      [-y,x,z]]
-    end
-
-    # return 24 lists of beacons
-    def compute_rotations
-      @rotations = beacons.map do |x ,y, z|
-        rotate_6_sides(x, y, z).flat_map do |rx, ry, rz|
-          rotate_4_faces(rx, ry, rz)
-        end
-      end.transpose
-    end
-
-    def match(other_scanner)
-      other_scanner.rotations.each do |other_beacons|
-        @beacons.each_with_index do |ref_beacon, index|
-          other_beacons.each_with_index do |other_ref_beacon, other_index|
-            # on considère que ref_beacon et other_ref_beacon sont le même beacon
-            vector = ref_beacon.zip(other_ref_beacon).map{_1-_2}
-            aligned_other_beacons = other_beacons.map{|other_beacon| other_beacon.zip(vector).map{_1+_2} }
-            if (@beacons & aligned_other_beacons).size >= BEACONS_COUNT
-              # vector sera la position relative
-              # other_beacons sera bien orienté
-              other_scanner.realign(aligned_other_beacons, vector.map{-_1})
-              return true
-            end
-          end
-        end
-      end
-      return false
-    end
-
   end
 
-  def self.parse(input)
-    scanner_datas = input.split(/--- scanner \d+ ---/)[1..]
-    scanner_datas.each.with_index.map do |scanner_data, index|
-      Scanner.new(index, 
-        scanner_data.split("\n")[1..].map do |beacon_datas|
-          beacon_datas.split(",").map(&:to_i)
-        end
-      )
+  def self.generate_distance(scanner)
+    scanner.map do |point1_x, point1_y, point1_z|
+      scanner.map do |point2_x, point2_y, point2_z|
+        (point1_x - point2_x)**2 + (point1_y - point2_y)**2 + (point1_z - point2_z)**2
+      end
     end
+  end
+
+  def self.correspondance(distances1, distances2)
+    corresp = {}
+    common = distances1.product(distances2).filter do |a, b|
+      inter = (a & b)
+      next if inter.size < 12
+
+      inter.each { |c| corresp[a.index(c)] = b.index(c) }
+    end
+    common.size >= 12 ? corresp : nil
+  end
+
+  def self.rotation_matrix(scanner1, scanner2)
+    vect1 = scanner1.transpose.map { |a, b| b - a }
+    vect2 = scanner2.transpose.map { |a, b| b - a }
+
+    matrix = Array.new(3) { Array.new(3, 0) }
+    vect2.each_with_index do |coord, i|
+      i2 = vect1.index(coord)
+      i2 ? matrix[i][i2] = 1 : matrix[i][vect1.index(-coord)] = -1
+    end
+    matrix
+  end
+
+  def self.rotate_with_matrix(scanner, rotation)
+    (Matrix[*scanner] * Matrix[*rotation]).to_a
+  end
+
+  def self.translation(destination_point, source_point)
+    source_point.zip(destination_point).map { |a, b| b - a }
+  end
+
+  def self.translate(scanner, translation)
+    scanner.map { |coords| coords.zip(translation).map { |a, b| a + b } }
   end
 
   def self.part1(input)
-    dontmatch = {}
-    scanners = parse(input)
-    aligned_scanners = [scanners.shift]
-    while scanners.size > 0
+    require 'matrix'
+    reference, *scanners = parse(input)
+    aligned = [reference]
+    aligned_count = 0
+    coords = [[0, 0, 0]]
+    while scanners.any?
+      current = aligned[aligned_count]
+      distances_current = generate_distance(current)
+      remove = []
       scanners.each do |scanner|
-        aligned_scanners.each do |aligned_scanner|
-          next if dontmatch[[aligned_scanner.index, scanner.index]]
-          if aligned_scanner.match(scanner)
-            aligned_scanners.push scanner
-            scanners.delete scanner
-            break
-          else
-            dontmatch[[aligned_scanner.index, scanner.index]] = true
-          end
+        distances_scanner = generate_distance(scanner)
+        h = correspondance(distances_current, distances_scanner)
+        if h
+          remove << scanner
+          scan1 = h.keys[1..2]
+          scan2 = h.values_at(*scan1)
+          rotation_matrix = rotation_matrix(scan1.map{|index|current[index]}, scan2.map{|index|scanner[index]})
+          scanner=rotate_with_matrix(scanner, rotation_matrix)
+          translation = translation(current[scan1.first], scanner[scan2.first])
+          coords << translation
+          scanner = translate(scanner, translation)
+          aligned << scanner
         end
       end
+      scanners -= remove
+      aligned_count += 1
     end
-
-    aligned_scanners.map(&:beacons).flatten(1).uniq.size
+    aligned.flatten(1).uniq.count
   end
-  
+
   def self.part2(input)
-    dontmatch = {}
-    scanners = parse(input)
-    aligned_scanners = [scanners.shift]
-    while scanners.size > 0
+    require 'matrix'
+    reference, *scanners = parse(input)
+    aligned = [reference]
+    aligned_count = 0
+    coords = [[0, 0, 0]]
+    while scanners.any?
+      current = aligned[aligned_count]
+      distances_current = generate_distance(current)
+      remove = []
       scanners.each do |scanner|
-        aligned_scanners.each do |aligned_scanner|
-          next if dontmatch[[aligned_scanner.index, scanner.index]]
-          if aligned_scanner.match(scanner)
-            aligned_scanners.push scanner
-            scanners.delete scanner
-            break
-          else
-            dontmatch[[aligned_scanner.index, scanner.index]] = true
-          end
+        distances_scanner = generate_distance(scanner)
+        h = correspondance(distances_current, distances_scanner)
+        if h
+          remove << scanner
+          scan1 = h.keys[1..2]
+          scan2 = h.values_at(*scan1)
+          rotation_matrix = rotation_matrix(scan1.map{|index|current[index]}, scan2.map{|index|scanner[index]})
+          scanner=rotate_with_matrix(scanner, rotation_matrix)
+          translation = translation(current[scan1.first], scanner[scan2.first])
+          coords << translation
+          scanner = translate(scanner, translation)
+          aligned << scanner
         end
       end
+      scanners -= remove
+      aligned_count += 1
     end
-    # In the above example, scanners 2 (1105,-1205,1229) and 3 (-92,-2380,-20)
-    # 1197 + 1175 + 1249 = 3621
-    # scanner 1 must be at 68,-1246,-43 (relative to scanner 0).
-    # So, scanner 4 is at -20,-1133,1061 (relative to scanner 0).
-    # scanner 2 must be at 1105,-1205,1229 (relative to scanner 0).
-    # scanner 3 must be at -92,-2380,-20 (relative to scanner 0)
-    aligned_scanners.flat_map do |s1|
-      aligned_scanners.map do |s2|
-        s1.scanner_position.zip(s2.scanner_position).sum{(_2-_1).abs}
-      end
-    end.max
+    coords.combination(2).map {|a,b| a.zip(b).sum{|c,d| (d-c).abs} }.max
   end
 end

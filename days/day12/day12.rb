@@ -1,64 +1,40 @@
 module Day12
   def self.parse(input)
-    paths = input.split("\n").map { |line| line.split '-' }
-    paths += paths.map { |p| p.reverse }
-  end
-
-  def self.get_paths(start)
-    @network.filter { |n| n.first == start }
-  end
-
-  def self.compute_paths(path, start)
-    if start == 'end'
-      @paths << path
-    else
-      next_paths = get_paths(start)
-      next_paths.each do |s, finish|
-        next if finish.downcase == finish && path.include?(finish)
-
-        new_path = path.dup
-        new_path << finish
-        compute_paths(new_path, finish)
-      end
+    lines = input.split("\n").map { |line| line.split('-') }
+    paths = Hash.new([])
+    lines.each do |line|
+      paths[line.first] += [line.last]
+      paths[line.last] += [line.first]
     end
+    paths.transform_values { |val| val - ['start'] }
+  end
+
+  def self.explore(paths, path)
+    return 1 if path.last == 'end'
+
+    paths[path.last].filter { |cave| cave == cave.upcase || !path.include?(cave) }
+                    .sum { |cave| explore(paths, path + [cave]) }
   end
 
   def self.part1(input)
-    @network = parse(input)
-    @paths = []
-    starts = get_paths('start')
-    starts.each do |start, finish|
-      path = [start, finish]
-
-      compute_paths(path, finish)
-    end
-    @paths.uniq.count
+    paths = parse(input)
+    explore(paths, ['start'])
   end
 
-  def self.compute_paths_2(path, start)
-    if start == 'end'
-      @paths << path
-    else
-      next_paths = get_paths(start)
-      next_paths.each do |s, finish|
-        next if finish == 'start' || (finish.downcase == finish && path.include?(finish) && (path.filter{ |cave| cave == cave.downcase }.uniq.count { |cave| path.count(cave) > 1 } != 0))
+  def self.explore2(paths, path)
+    return 1 if path.last == 'end'
 
-        new_path = path.dup
-        new_path << finish
-        compute_paths_2(new_path, finish)
+    paths[path.last].sum do |cave|
+      if cave == cave.upcase || !path.include?(cave)
+        explore2(paths, path + [cave])
+      else
+        explore(paths, path + [cave])
       end
     end
   end
 
   def self.part2(input)
-    @network = parse(input)
-    @paths = []
-    starts = get_paths('start')
-    starts.each do |start, finish|
-      path = [start, finish]
-
-      compute_paths_2(path, finish)
-    end
-    @paths.uniq.count
+    paths = parse(input)
+    explore2(paths, ['start'])
   end
 end

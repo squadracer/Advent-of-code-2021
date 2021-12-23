@@ -1,99 +1,42 @@
 module Day11
   def self.parse(input)
-    input.split("\n").map { |line| line.chars.map(&:to_i) }
+    input.split.map { |line| line.chars.map(&:to_i) }
+  end
+
+  def self.increase(board, x, y)
+    return 0 if x.negative? || y.negative? || x >= board.size || y >= board.size
+
+    neighbours = [[-1, -1], [-1, 0], [-1, 1],
+                  [0, -1],           [0, 1],
+                  [1, -1], [1, 0], [1, 1]]
+
+    board[y][x] += 1
+    board[y][x] == 10 ? 1 + neighbours.sum { |dx, dy| increase(board, x + dx, y + dy) } : 0
+  end
+
+  def self.step(board)
+    flashes = (0...board.size).sum { |y| (0...board.size).sum { |x| increase(board, x, y) } }
+    board.map! { |line| line.map { |cell| cell >= 10 ? 0 : cell } }
+    flashes
   end
 
   def self.part1(input)
-    @array = parse(input)
-    flashing_count = 0
+    board = parse(input)
+    flashes = 0
     100.times do
-      flashing_octopuses = []
-
-      @array.map do |line|
-        line.map! { |octopus| octopus + 1 if octopus }
-      end
-
-      @array.each_with_index do |line, y|
-        line.each_with_index do |octopus, x|
-          flashing_octopuses << [x, y] if octopus > 9
-        end
-      end
-
-      flashing_octopuses.each do |flashing_octopus|
-        enligth_octopus(flashing_octopus)
-      end
-
-      @array.each_with_index do |line, y|
-        line.each_with_index do |octopus, x|
-          if octopus > 9
-            @array[y][x] = 0
-            flashing_count += 1
-          end
-        end
-      end
+      flashes += step(board)
     end
-
-    flashing_count
-  end
-
-  def self.enligth_octopus(octopus)
-    octopus_neighbors = get_neighbors(octopus) 
-    octopus_neighbors.each do |current_octopus|
-      octopus_x, octopus_y = current_octopus
-      next if octopus[0] == octopus_x && octopus[1] == octopus_y
-
-      @array[octopus_y][octopus_x] += 1
-      enligth_octopus(current_octopus) if @array[octopus_y][octopus_x] == 10
-    end
-  end
-
-
-  def self.get_neighbors(octopus)
-    x, y = octopus
-    [
-      [[x - 1, 0].max, [y - 1, 0].max],
-      [[x, 0].max, [y - 1, 0].max],
-      [[x + 1, 9].min, [y - 1, 0].max],
-      [[x - 1, 0].max, y],
-      [[x + 1, 9].min, y],
-      [[x - 1, 0].max, [y + 1, 9].min],
-      [[x, 0].max, [y + 1, 9].min],
-      [[x + 1, 9].min, [y + 1, 9].min]
-    ].uniq
+    flashes
   end
 
   def self.part2(input)
-    @array = parse(input)
-    flashing_count = 0
-    steps = 0
-    while flashing_count != 100 do
-      steps += 1
-      flashing_count = 0
-      flashing_octopuses = []
-
-      @array.map do |line|
-        line.map! { |octopus| octopus + 1 if octopus }
-      end
-
-      @array.each_with_index do |line, y|
-        line.each_with_index do |octopus, x|
-          flashing_octopuses << [x, y] if octopus > 9
-        end
-      end
-
-      flashing_octopuses.each do |flashing_octopus|
-        enligth_octopus(flashing_octopus)
-      end
-
-      @array.each_with_index do |line, y|
-        line.each_with_index do |octopus, x|
-          if octopus > 9
-            @array[y][x] = 0
-            flashing_count += 1
-          end
-        end
-      end
+    board = parse(input)
+    flashes = 0
+    i = 0
+    while flashes < 100
+      flashes = step(board)
+      i += 1
     end
-    steps
+    i
   end
 end
